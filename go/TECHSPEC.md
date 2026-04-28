@@ -70,8 +70,8 @@ insert {t1: new_time, t2: nil, value: value}
 ### 1.3 get_state_at(t) — Point Lookup
 
 Return the last point where `t1 < t`. This means:
-- A point at `t1=100` is visible at `t=101` but NOT at `t=100`.
-- This is a strict less-than lookup.
+- A point inserted at `t1=100` is returned by `get_state_at(101)` but NOT by `get_state_at(100)`.
+- This is a strict less-than lookup on the `t1` key: find all points where `t1 < t`, return the one with the largest `t1`.
 
 ### 1.4 contains(t) — Point Containment
 
@@ -95,6 +95,12 @@ last point exists AND last.t2 == nil AND last.value == value
 - Points in one timeline but not the other
 - Overlapping intervals that need splitting
 - Merging aligned intervals using `f(left_value, right_value)`
+
+**IMPORTANT NOTE FOR GO PORT**: The `zip_with`, `and()`, `or()`, `tl_duration_where()` batch methods exist in the Rust original's `common-rust/common-lib/` crate but are **NOT used by the agent (workflow) implementation**. The agents use a simpler per-event push model:
+- `And`/`Or` nodes store each child's state in separate `left_child_state`/`right_child_state` timelines and do point lookups with `get_state_at(time+1)`.
+- `DurationWhere` uses a `DurationState` state machine (Climbing/Flat) instead of the batch `tl_duration_where()` method.
+
+**What to implement in Go**: Only `add_state_dynamic_info`, `get_state_at`, `is_empty`, `future_is`, `last`, and `map` are needed for the Temporal workflows. The batch `zip_with`/`and`/`or`/`tl_duration_where` methods do NOT need to be ported.
 
 ---
 
