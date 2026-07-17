@@ -1,32 +1,28 @@
-# Durable Timeline Analytics For Data Engineering
+# Durable Timeline Analytics for Data Engineering
 
-This is inspired from [TimeLine Analytics](https://www.cidrdb.org/cidr2023/papers/p22-milner.pdf) and it's extention, but most importantly,
-system being backed by new agentic runtime [Golem](https://learn.golem.cloud) that's also a durable execution engine.
+Inspired by [TimeLine Analytics](https://www.cidrdb.org/cidr2023/papers/p22-milner.pdf) and its extensions — and backed by the agentic runtime [Golem](https://learn.golem.cloud), which is also a durable execution engine.
 
-Watch the talk from Afsal at [LambdaConf:2024:Estes-Park:Colorado](https://www.youtube.com/watch?v=9WjUBOfgriY) or refer presentation slides [here](https://github.com/afsalthaj/golem-timeline-presentation/blob/main/presentation_last.pdf)
+Watch the talk from Afsal at [LambdaConf 2024 (Estes Park, Colorado)](https://www.youtube.com/watch?v=9WjUBOfgriY), or see the [presentation slides](https://github.com/afsalthaj/golem-timeline-presentation/blob/main/presentation_last.pdf).
 
-# A management UI
+## Management UI
 
-![img.png](images/img.png)
+![Dashboard overview](images/img.png)
 
-## Deploy a Metric
+### Deploy a Metric
 
-![img_1.png](images/img_1.png)
+![Deploy a metric](images/img_1.png)
 
 ### Computation Graph
 
-![img_2.png](images/img_2.png)
+![Computation graph](images/img_2.png)
 
-## Computation streaming
+### Computation Streaming
 
-![img.png](images/stream.png)
+![Computation streaming](images/stream.png)
 
-## Aggregation Results
+### Aggregation Results
 
-![img.png](images/aggregate.png)
-
-
-You will get more idea about the dashboard soon.
+![Aggregation results](images/aggregate.png)
 
 ## Timeline Query DSL
 
@@ -63,72 +59,66 @@ duration_where(
 
 ## A visual model of the above DSL logic
 
-
 ### Actual timeline
-```jquery-css
+
+```text
       |
 seek  |                   seek
-      |               
+      |
 buffer|                               ---(buffer)---
-play  |         ---(play)--             
-t ---------------------------------------------->  
+play  |         ---(play)--
+t ---------------------------------------------->
                 t1        t2          t3          t10
 ```
 
-#### TLHas_Existed(play)
+#### TLHasExisted(play)
 
-```jquery-css
+```text
      (play)--------------------------------------
 -----t1
 ```
 
-#### Not TLHas_Existed_Within(seek, 5sec)
+#### Not TLHasExistedWithin(seek, 5sec)
 
-```jquery-css
-                         
-t1----------               t7-------------             
-                         
+```text
+t1----------               t7-------------
+
            t2---(seek+5)---t7
-
 ```
 
-#### Latest state is buffer (TL_LatestEventToState)
+#### Latest state is buffer (TLLatestEventToState)
 
-```jquery-css
-            t3-------------(bufer)
+```text
+            t3-------------(buffer)
 
--------------  
+-------------
 t1          t3
-
 ```
 
 #### And all of it
 
-```jquery-css
-
+```text
                     t7--------t10
-       
+
 t1------t2----------t7
 ```
 
-#### TL_duration_where:
+#### TLDurationWhere
 
-```jquery-css
-
+```text
 3sec                            /
 2sec                          /
 1sec                        /
 0sec----------------------/
                           t7  t8 t9 t10
-
 ```
 
-The summary of the above timeline is as follows:
-> User did start playing at some point. After playing user did perform a seek event
-> at some point. We extend this event to a configurable 5 seconds. Even after
-> extending the seek event to 5 seconds, we can see there still exists 3 seconds
-> of buffering, indicating this buffering may not be the direct outcome of seek -
-> contributing to the connection induced rebuffering!
+Summary of the timeline above:
+
+> The user started playing at some point, then performed a seek. We extend that seek
+> by a configurable 5 seconds. Even after that window, 3 seconds of buffering remain —
+> so this buffering is unlikely to be seek-induced, and contributes to connection-induced
+> rebuffering.
 
 ## More examples
 
@@ -140,11 +130,13 @@ duration_in_cur_state(
 ```
 
 **Credit card location anomaly — location changed too quickly:**
+
 ```javascript
 duration_in_cur_state(
-  latest_event_to_state(location)) 
+  latest_event_to_state(location)
 ) < 600
 ```
+
 If the cardholder has been at the current location for less than 600 seconds,
 the location just changed — flag it as a potential anomaly (e.g., New York → London in 10 minutes).
 
@@ -227,15 +219,16 @@ Press `Ctrl+C` to stop the dashboard. The demo script automatically stops Golem 
 
 ## Overview
 
-The project is a merging the ideas from the TimeLine DSL — a composable language for expressing temporal analytics over event streams, into Golem's Runtime.
-Each node in a timeline expression maps to a durable Golem agent (worker). The architecture is **fully push-based**:
-leaf nodes ingest events and push state changes upward through the agent tree. Derived nodes recompute
-incrementally on each notification and cascade changes to their parents. Point-in-time queries are local
-lookups on precomputed state — no cascading RPC required at query time.
+This project merges the TimeLine DSL — a composable language for temporal analytics over event
+streams — with Golem's runtime. Each node in a timeline expression maps to a durable Golem agent
+(worker). The architecture is **fully push-based**: leaf nodes ingest events and push state changes
+upward through the agent tree. Derived nodes recompute incrementally on each notification and
+cascade changes to their parents. Point-in-time queries are local lookups on precomputed state —
+no cascading RPC at query time.
 
 ### Architecture
 
-```sh
+```text
                           ┌─────────────────┐
                           │ TimelineDriver  │  (1) Walks the DSL tree, spawns agents,
                           │ (orchestrator)  │      wires ParentRef / AggregatorRef
@@ -320,8 +313,8 @@ across all sessions grouped under `cdn-x`.
 
 ### Feed events
 
-Once the timeline is initialized (this may not be required as such in near future as initialisation is idempotent in golem), 
-feed events to the leaf EventProcessor agents.
+Once the timeline is initialized, feed events to the leaf EventProcessor agents.
+(`initialize_timeline` is idempotent on Golem — safe to call again with the same graph.)
 The driver logs which agent names it created — use those to target events:
 
 ```shell
@@ -353,7 +346,7 @@ Pulsar or Kafka.
 
 ### End-to-end architecture
 
-```jquery-css
+```text
 ┌────────────────┐     ┌───────────────┐      ┌────────────────────────────────────┐
 │  Video Players │────▶│  Pulsar/Kafka │────▶ │  Feeder (Pulsar Consumer)          │
 │  (millions of  │     │  Topic:       │      │                                    │
@@ -384,8 +377,8 @@ Pulsar or Kafka.
 The feeder is a standalone process (not a Golem agent) that bridges the message broker
 and Golem. Here is the event routing logic:
 
-```jquery-css
-                    ┌─────────────────────────────────────------------------------─┐
+```text
+                    ┌──────────────────────────────────────────────────────────────┐
                     │          Feeder (Consumer)                                   │
                     │                                                              │
                     │  Event arrives from Pulsar:                                  │
@@ -396,33 +389,30 @@ and Golem. Here is the event routing logic:
                     │                                                              │
                     │  1. session_id = "sess-42"                                   │
                     │                                                              │
-                    │  2. First event for this session?                            │
-                    │     YES → call initialize_timeline                           │
-                    │           on TimelineDriver("sess-42")                       │
-                    │     NO  → skip (already initialized)                         │
+                    │  2. Call initialize_timeline on TimelineDriver("sess-42")    │
+                    │     (idempotent — first call spawns agents; later calls      │
+                    │      return the same InitializeResult)                       │
                     │                                                              │
                     │  3. Column is "playerStateChange"                            │
                     │     → route to has-existed-4 AND latest-event-to-state-8     │
                     │                                                              │
                     │     If column were "userAction"                              │
                     │     → route to has-existed-within-6 only                     │
-                    └────────────┬─────────---─┬───────────────────────────────────┘
-                                 │             │
-              ┌──────────────────▼---┐   ┌─────▼────────────────────────────-─┐
-              │  EventProcessor      │   │  EventProcessor                    │
-              │  "sess-42-has-       │   │  "sess-42-latest-event-to-state-8" │
-              │   existed-4"         │   │  (TlLatestEventToState)            │
-              │  (TlHasExisted)      │   │                                    │
-              └─────────────────────-┘   └────────────────────────────────────┘
+                    └────────────┬─────────────────┬───────────────────────────────┘
+                                 │                 │
+              ┌──────────────────▼───┐   ┌─────────▼─────────────────────────────┐
+              │  EventProcessor      │   │  EventProcessor                       │
+              │  "sess-42-has-       │   │  "sess-42-latest-event-to-state-8"    │
+              │   existed-4"         │   │  (TlLatestEventToState)               │
+              │  (TlHasExisted)      │   │                                       │
+              └──────────────────────┘   └───────────────────────────────────────┘
 ```
 
 Note that **one event can fan out to multiple leaves**. A `playerStateChange` event
 must be sent to both `has-existed-4` (which checks "has play ever existed?") and `latest-event-to-state-8`
 (which tracks the latest state). The feeder is responsible for this fan-out.
 
-The feeder only needs to track **which sessions have been initialized** (a simple
-`HashSet<SessionId>`, not a full plan per session). The routing logic is static
-and identical for every session:
+The routing logic is static and identical for every session:
 
 ```rust
 // Static routing table — derived once from the CIRR workflow
@@ -442,7 +432,7 @@ fn route_event(session_id: &str, column: &str) -> Vec<String> {
 
 ### Runtime event flow — Afsal and John watch movies
 
-```jquery-css
+```text
 Timeline: 8 PM Friday
 
   Afsal starts "The Mandalorian"           John starts "Moana"
@@ -491,7 +481,7 @@ Only the agents currently processing a push notification are active. When Afsal'
 
 All of John's agents remain completely suspended during this — zero cost.
 
-### Step 5: Querying results
+### Querying results
 
 **Per-session query** — "What is Afsal's CIRR duration right now?"
 
@@ -563,7 +553,7 @@ the Kubernetes deployment looks like.
 
 Consider the full CIRR expression from the examples above:
 
-```sh
+```text
 TlDurationWhere(
   And(
     And(
@@ -577,7 +567,7 @@ TlDurationWhere(
 
 The `TimelineDriver` walks this tree and spawns one agent per node:
 
-```js
+```text
                     TlDurationWhere          ← TimelineProcessor
                          │
                         And                  ← TimelineProcessor
@@ -718,7 +708,7 @@ agent types (EventProcessor, TimelineProcessor, TimelineDriver, Aggregator) — 
 building blocks, not metric-specific. Every metric expression (CIRR, Time-to-First-Play, engagement
 scores, etc.) uses the same deployed component. There is no per-metric deployment.
 
-```jquery-css
+```text
 ┌────────────────────────────────────────────────────────────────┐
 │                     Golem Cluster                              │
 │                                                                │
@@ -742,8 +732,6 @@ scores, etc.) uses the same deployed component. There is no per-metric deploymen
 | **Admin** | Deploy/update `timeline-core` to Golem. Manage the cluster, feeders, and Kafka infrastructure. | — |
 | **Developer** | Write a metric expression in the DSL. Click "Deploy Metric" to register it. View sub-computation results, session lists, and aggregation data. | Deploy or modify the timeline-core component. |
 
-Admins deploy the platform. Developers use it.
-
 ### What "Deploy Metric" does
 
 When a developer writes a metric and clicks deploy, the system does **not** deploy a new component.
@@ -764,11 +752,10 @@ Instead:
 
 3. **Feeder picks up the new metric** — the feeder (Kafka consumer) must learn about the new
    metric's leaf routing table so it can start sending events to the right agents. For every
-   incoming event on a session:
-   - If the feeder hasn't seen this session+metric before, it first invokes
-     `timeline-driver("{session-id}")` → `initialize-timeline(graph, aggregation)` to spawn
-     and wire all agents for that session.
-   - It then sends the event to every leaf agent for that metric:
+   incoming event on a session it:
+   - Invokes `timeline-driver("{session-id}")` → `initialize-timeline(graph, aggregation)`
+     (idempotent — see below) to spawn and wire agents on first use, then reuse them.
+   - Sends the event to every leaf agent for that metric:
      `event-processor("{session-id}-has-existed-4").add-event(...)`,
      `event-processor("{session-id}-has-existed-within-6").add-event(...)`,
      `event-processor("{session-id}-latest-event-to-state-8").add-event(...)`.
@@ -795,10 +782,9 @@ templates — it's just a static event router.
 **The driver returns the leaf agent names:**
 
 `initialize_timeline` returns an `InitializeResult` containing the root agent name and
-all leaf agent names. The feeder calls the driver on every event for a session and gets
-back exactly which `event-processor` agents to send events to — no graph walking, no
-tracking, no in-memory state. The driver is a durable Golem agent: the first call spawns
-and wires all agents; subsequent calls are idempotent and return the same result.
+all leaf agent names. The feeder can call the driver on every event and get back exactly which
+`event-processor` agents to send events to — no graph walking required. First call spawns and
+wires agents; subsequent calls are idempotent and return the same result.
 
 **The hard problem — how does a running feeder learn about a new metric?**
 
@@ -818,7 +804,7 @@ feeder immediately starts routing events to its leaf agents — no polling delay
 
 A concrete example of the CIRR metric with events arriving from Kafka:
 
-```jquery-css
+```text
 Feeder startup:
   1. Consumes CIRR graph + aggregation config from timeline-metrics-config topic
   2. Ready to process events
@@ -834,51 +820,38 @@ Processing event1 (sess-42):
      → Returns InitializeResult:
          root_agent:  "sess-42-duration-where-1"
          leaf_agents: ["sess-42-has-existed-4", "sess-42-has-existed-within-6", "sess-42-latest-event-to-state-8"]
-     2. Sends event to each leaf from the result:
+  2. Sends event to each leaf from the result:
        event-processor("sess-42-has-existed-4").add-event(...)
        event-processor("sess-42-has-existed-within-6").add-event(...)
        event-processor("sess-42-latest-event-to-state-8").add-event(...)
 
-     Processing event2 (sess-42 again):
-     1. Calls: timeline-driver("sess-42").initialize-timeline(cirr_graph, agg_config)
+Processing event2 (sess-42 again):
+  1. Calls: timeline-driver("sess-42").initialize-timeline(cirr_graph, agg_config)
      → Driver is durable — agents already exist, idempotent, no re-wiring
-     → Returns same InitializeResult:
-         root_agent:  "sess-42-duration-where-1"
-         leaf_agents: ["sess-42-has-existed-4", "sess-42-has-existed-within-6", "sess-42-latest-event-to-state-8"]
-     2. Sends event to the 3 leaves
+     → Returns the same InitializeResult
+  2. Sends event to the 3 leaves
 
-     Processing event3 (sess-99):
-     1. Calls: timeline-driver("sess-99").initialize-timeline(...)
+Processing event3 (sess-99):
+  1. Calls: timeline-driver("sess-99").initialize-timeline(...)
      → New session — spawns 8 fresh agents
-     → Returns InitializeResult:
-         root_agent:  "sess-99-duration-where-1"
-         leaf_agents: ["sess-99-has-existed-4", "sess-99-has-existed-within-6", "sess-99-latest-event-to-state-8"]
+     → Returns InitializeResult for sess-99's agents
   2. Sends event to sess-99's leaves
 ```
 
-**Key point**: the feeder calls `initialize_timeline` on every event. No in-memory state,
-no tracking which sessions exist. The driver is a durable Golem worker — first call spawns
-agents, subsequent calls are idempotent and return the same `InitializeResult`. The feeder
-gets the leaf agent names directly from the return value.
-
 ### Idempotency — `initialize_timeline` is safe to call repeatedly
 
-Golem workers are durable. Calling `initialize_timeline` on an already-initialized session
-simply overwrites `operation`, `children`, and `parent` with the same values (same graph =
-same configuration). The accumulated `StateDynamicsTimeLine` state is untouched — `initialize_leaf`
-and `initialize_derived` don't clear it. So the feeder can safely call the driver on every
-event without tracking which sessions have been initialized.
-
-
+The feeder can call `initialize_timeline` on every event. No in-memory session tracking is required:
+the driver is a durable Golem worker — first call spawns agents; subsequent calls are idempotent and
+return the same `InitializeResult` (leaf agent names included). Calling it again overwrites
+`operation`, `children`, and `parent` with the same values; the accumulated `StateDynamicsTimeLine`
+state is untouched (`initialize_leaf` / `initialize_derived` do not clear it).
 
 ### Session discovery
 
-There is no separate session registry. The feeder discovers session IDs from the event stream
-(e.g., Kafka message keys). When an event arrives for a session the feeder hasn't seen before,
-it initializes the agents for that session. Developers look up a specific session ID to inspect
-its sub-computation results — there is no need to enumerate all sessions (which would be
-impossible at scale). The developer either knows the session ID they want to debug, or
-finds it from their own application logs / event stream.
+There is no separate session registry. Session IDs come from the event stream (e.g., Kafka message
+keys). Developers look up a specific session ID to inspect sub-computation results — there is no
+need to enumerate all sessions at scale. The developer either knows the session ID they want to
+debug, or finds it from application logs / the event stream.
 
 ### Metric-level compute reuse
 
@@ -959,7 +932,7 @@ The developer doesn't need to construct these names manually. The dashboard show
 Timeline expressions naturally share sub-expressions. Consider a streaming platform that
 runs two workflows for the same session:
 
-```jquery-css
+```text
 Workflow A (CIRR):
   TlDurationWhere(
     And(
@@ -977,7 +950,7 @@ computes `Y` once, and both Workflow A's `And` node and Workflow B's root consum
 output. This is **compute reuse** — the agent DAG shares common sub-expressions instead
 of duplicating them.
 
-```jquery-css
+```text
 Without reuse (current):              With reuse (future):
 
   Workflow A        Workflow B           Workflow A        Workflow B
@@ -1037,18 +1010,18 @@ There is no "add another parent" operation.
 
 ### What the fix looks like
 
-```jquery-css
+```text
                  Current                              Future
           ┌──────────────────┐                ┌──────────────────┐
           │   ParentRef      │                │   Vec<ParentRef> │
           │   (single)       │                │   (fan-out)      │
           └──────────────────┘                └──────────────────┘
 
-          ┌──────────────────┐                ┌─────────────────-─┐
+          ┌──────────────────┐                ┌──────────────────┐
           │  "{sid}-node-{N}"│                │  content-addressed│
           │  (positional)    │                │  naming (hash of  │
           └──────────────────┘                │  operation + cols)│
-                                              └─────────────────-─┘
+                                              └──────────────────┘
 
           ┌──────────────────┐                ┌──────────────────┐
           │  initialize_leaf │                │  add_parent_ref  │
